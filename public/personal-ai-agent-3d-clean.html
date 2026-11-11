@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal AI Agent - 3D Interactive Showcase</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Three.js & GSAP Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #e9ebe2;
+      color: #212529;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    .mono {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Glass Overlay UI Elements */
+    .hero-card {
+      background: rgba(235, 233, 226, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .glass-btn {
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .glass-btn:hover {
+      background: rgba(255, 255, 255, 0.98);
+      transform: translateY(-1px);
+    }
+
+    .glass-btn.active {
+      background: #3b82f6;
+      color: white;
+      border-color: #2563eb;
+    }
+
+    /* Speech Bubble Animation Styling */
+    .voice-bubble {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: #ffffff;
+      border: 2px solid #3b82f6;
+      color: #1e293b;
+      padding: 8px 14px;
+      border-radius: 16px;
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 30;
+      white-space: nowrap;
+    }
+
+    .voice-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 8px 8px 0;
+      border-style: solid;
+      border-color: #ffffff transparent;
+      display: block;
+      width: 0;
+    }
+
+    .voice-bubble.visible {
+      opacity: 1;
+      transform: translate(-50%, -120%);
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    html, body { width: 100%; height: 100%; min-height: 0; margin: 0; overflow: hidden; background: #e9ebe2; }
+    body { position: relative; }
+    #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+    #canvas-container canvas { display: block; width: 100%; height: 100%; }
+    body > .absolute:not(#canvas-container), body > #speech-bubble, body > #monitor-canvas { display: none !important; }  </style>
+</head>
+<body class="w-screen h-screen overflow-hidden">
+
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
+
+  <!-- Dynamic Speech Bubble overlay for Character Voice Commands -->
+  <div id="speech-bubble" class="voice-bubble">
+    <i class="fa-solid fa-microphone text-blue-500 mr-1.5 animate-pulse"></i>
+    <span id="speech-text">"Checking system diagnostics..."</span>
+  </div>
+
+  <!-- TOP MINIMAL UI HEADER -->
+  <div class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    
+    <!-- Left Meta Info Header -->
+    <div class="hero-card px-4 py-2 rounded-xl pointer-events-auto flex items-center gap-3">
+      <span class="text-xs font-semibold tracking-wider text-gray-400 mono">05 / AGENTS · TOOL USE</span>
+      <h1 class="text-sm font-bold text-gray-900 border-l border-gray-300 pl-3">Personal AI Agent</h1>
+      <div class="hidden lg:flex items-center gap-1.5 mono text-[10px] border-l border-gray-300 pl-3">
+        <span class="px-1.5 py-0.5 bg-white/90 border border-gray-300/80 rounded text-gray-700">Python</span>
+        <span class="px-1.5 py-0.5 bg-white/90 border border-gray-300/80 rounded text-gray-700">Gemini</span>
+        <span class="px-1.5 py-0.5 bg-blue-100 border border-blue-300 rounded text-blue-800 font-medium">LangChain</span>
+        <span class="px-1.5 py-0.5 bg-indigo-100 border border-indigo-300 rounded text-indigo-800 font-medium">MCP</span>
+      </div>
+    </div>
+
+    <!-- Right Tool Workflow Stages Navigation -->
+    <div class="hero-card p-1.5 rounded-xl pointer-events-auto flex items-center gap-1 text-[11px] mono">
+      <button onclick="goToStage(0)" id="step-btn-0" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold">1</span>
+        <span class="hidden sm:inline">Voice Cmd</span>
+      </button>
+
+      <button onclick="goToStage(1)" id="step-btn-1" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">2</span>
+        <span class="hidden sm:inline">System Tool</span>
+      </button>
+
+      <button onclick="goToStage(2)" id="step-btn-2" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">3</span>
+        <span class="hidden sm:inline">Weather Tool</span>
+      </button>
+
+      <button onclick="goToStage(3)" id="step-btn-3" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">4</span>
+        <span class="hidden sm:inline">Calc & Files</span>
+      </button>
+
+      <button onclick="goToStage(4)" id="step-btn-4" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">5</span>
+        <span class="hidden sm:inline">Final Report</span>
+      </button>
+
+      <button id="btn-replay" class="glass-btn px-2 py-1 rounded-lg text-gray-700 ml-1" title="Replay Sequence">
+        <i class="fa-solid fa-rotate-right text-[10px]"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- BOTTOM STATUS & CONTROL BAR -->
+  <div class="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-20 w-11/12 max-w-lg pointer-events-auto">
+    <div class="hero-card px-4 py-2 rounded-full flex items-center justify-between shadow-md">
+      <div class="flex items-center gap-2 overflow-hidden mr-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping shrink-0"></span>
+        <span id="status-text" class="text-[11px] font-medium mono text-gray-700 truncate">Character issuing voice prompt...</span>
+      </div>
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="btn-prev" class="w-7 h-7 rounded-full glass-btn flex items-center justify-center text-[10px] text-gray-700">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <button id="btn-play-pause" class="px-2.5 py-1 rounded-full glass-btn text-[10px] font-semibold mono text-blue-800 flex items-center gap-1">
+          <i id="play-icon" class="fa-solid fa-pause"></i>
+          <span id="play-text">Pause</span>
+        </button>
+        <button id="btn-next" class="w-7 h-7 rounded-full glass-btn flex items-center justify-center text-[10px] text-gray-700">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Offscreen Canvas for Screen Texture -->
+  <canvas id="monitor-canvas" width="512" height="384" class="hidden"></canvas>
+
+  <script>
+    /* =========================================================================
+     * 1. GLOBAL STATE & THREE.JS SETUP
+     * ========================================================================= */
+    let scene, camera, renderer, controls;
+    let computerGroup, monitorMesh, petAgentGroup, characterGroup, chaiSteamParticles = [];
+    let monitorCanvas, monitorCtx, monitorTexture;
+    let beamLine, beamGeo;
+    let toolNodes = {};
+
+    let currentStage = 0;
+    let isPlaying = true;
+    let stageTimeline = null;
+
+    const STAGE_DESCRIPTIONS = [
+      "Stage 1/5: Character sipping chai & issuing initial voice command...",
+      "Stage 2/5: AI Pet flies to SYSTEM INFO tool -> Updates computer screen!",
+      "Stage 3/5: AI Pet flies to WEATHER API tool -> Fetches live forecast data!",
+      "Stage 4/5: AI Pet flies to CALCULATOR & FILE MANAGER -> Executes MCP tool tasks!",
+      "Stage 5/5: AI Pet returns to Screen -> Generates full synthesis report!"
+    ];
+
+    const COLORS = {
+      bg: 0xe9ebe2,
+      grid: 0xc8c6be,
+      blueAccent: 0x3b82f6,
+      darkTerminal: 0x0f172a,
+      woodDesk: 0xd6cbb0,
+      deskLegs: 0x334155,
+      petCore: 0x60a5fa,
+      nodeSys: 0x3b82f6,
+      nodeWeather: 0x0ea5e9,
+      nodeCalc: 0x8b5cf6,
+      nodeFile: 0xf59e0b,
+      nodeDate: 0x10b981,
+      chaiCup: 0xd97706,
+      chaiTea: 0x92400e
+    };
+
+    /* =========================================================================
+     * 2. INITIALIZATION
+     * ========================================================================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      initScene();
+      initMonitorCanvas();
+      buildEnvironment();
+      buildComputerDeskAndChai();
+      buildSittingCharacter();
+      build3DPetAgent();
+      buildToolNodes();
+      setupLighting();
+      setupEvents();
+
+      startSequenceTimeline();
+      animate();
+    });
+
+    function initScene() {
+      const container = document.getElementById('canvas-container');
+      
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(COLORS.bg);
+      scene.fog = new THREE.Fog(COLORS.bg, 25, 60);
+
+      camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+      camera.position.set(0, 4.8, 11.5);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.02;
+      controls.minDistance = 3;
+      controls.maxDistance = 25;
+      controls.target.set(0, 1.8, 0);
+    }
+
+    function setupLighting() {
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(8, 14, 8);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 0.5;
+      dirLight.shadow.camera.far = 30;
+      dirLight.shadow.camera.left = -10;
+      dirLight.shadow.camera.right = 10;
+      dirLight.shadow.camera.top = 10;
+      dirLight.shadow.camera.bottom = -10;
+      scene.add(dirLight);
+
+      const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.45);
+      fillLight.position.set(-8, 6, -6);
+      scene.add(fillLight);
+    }
+
+    function buildEnvironment() {
+      const gridHelper = new THREE.GridHelper(40, 40, COLORS.grid, COLORS.grid);
+      gridHelper.position.y = 0;
+      gridHelper.material.opacity = 0.7;
+      gridHelper.material.transparent = true;
+      scene.add(gridHelper);
+
+      const planeGeo = new THREE.PlaneGeometry(80, 80);
+      const planeMat = new THREE.ShadowMaterial({ opacity: 0.1 });
+      const shadowPlane = new THREE.Mesh(planeGeo, planeMat);
+      shadowPlane.rotation.x = -Math.PI / 2;
+      shadowPlane.position.y = -0.01;
+      shadowPlane.receiveShadow = true;
+      scene.add(shadowPlane);
+    }
+
+    /* =========================================================================
+     * 3. MONITOR SCREEN TEXTURE
+     * ========================================================================= */
+    function initMonitorCanvas() {
+      monitorCanvas = document.getElementById('monitor-canvas');
+      monitorCtx = monitorCanvas.getContext('2d');
+      monitorTexture = new THREE.CanvasTexture(monitorCanvas);
+      monitorTexture.encoding = THREE.sRGBEncoding;
+      updateMonitorDisplay("IDLE", ["AI Agent listening for voice commands..."]);
+    }
+
+    function updateMonitorDisplay(status, logsArray) {
+      const w = monitorCanvas.width;
+      const h = monitorCanvas.height;
+
+      monitorCtx.fillStyle = '#0f172a';
+      monitorCtx.fillRect(0, 0, w, h);
+
+      // Window Bar
+      monitorCtx.fillStyle = '#1e293b';
+      monitorCtx.fillRect(0, 0, w, 40);
+
+      monitorCtx.fillStyle = '#ef4444'; monitorCtx.beginPath(); monitorCtx.arc(18, 20, 5, 0, Math.PI * 2); monitorCtx.fill();
+      monitorCtx.fillStyle = '#f59e0b'; monitorCtx.beginPath(); monitorCtx.arc(34, 20, 5, 0, Math.PI * 2); monitorCtx.fill();
+      monitorCtx.fillStyle = '#10b981'; monitorCtx.beginPath(); monitorCtx.arc(50, 20, 5, 0, Math.PI * 2); monitorCtx.fill();
+
+      monitorCtx.fillStyle = '#94a3b8';
+      monitorCtx.font = '600 13px "Fira Code", monospace';
+      monitorCtx.fillText("Gemini AI Agent CLI --MCP Active", 70, 24);
+
+      monitorCtx.fillStyle = status === "SYNTHESIS" ? '#10b981' : '#3b82f6';
+      monitorCtx.fillRect(w - 135, 10, 120, 20);
+      monitorCtx.fillStyle = '#ffffff';
+      monitorCtx.font = 'bold 10px "Fira Code", monospace';
+      monitorCtx.fillText(status, w - 128, 24);
+
+      // Console Area
+      monitorCtx.fillStyle = '#020617';
+      monitorCtx.fillRect(15, 52, w - 30, h - 68);
+
+      monitorCtx.fillStyle = '#38bdf8';
+      monitorCtx.font = 'bold 12px "Fira Code", monospace';
+      monitorCtx.fillText(">>> VOICE_LISTENER: ACTIVE", 28, 75);
+
+      let yPos = 102;
+      logsArray.forEach((line, idx) => {
+        if (line.startsWith("[VOICE]")) monitorCtx.fillStyle = '#facc15';
+        else if (line.startsWith("[TOOL RETURN]")) monitorCtx.fillStyle = '#34d399';
+        else if (line.startsWith("->")) monitorCtx.fillStyle = '#93c5fd';
+        else monitorCtx.fillStyle = '#cbd5e1';
+
+        monitorCtx.font = '11px "Fira Code", monospace';
+        monitorCtx.fillText(line, 28, yPos);
+        yPos += 22;
+      });
+
+      // Cursor line
+      monitorCtx.fillStyle = '#38bdf8';
+      monitorCtx.fillRect(28, h - 35, 10, 15);
+
+      if (monitorTexture) monitorTexture.needsUpdate = true;
+    }
+
+    /* =========================================================================
+     * 4. 3D MODELS (Desk, Chair, Hot Chai, Sitting Character, Pet & Tool Nodes)
+     * ========================================================================= */
+    function buildComputerDeskAndChai() {
+      computerGroup = new THREE.Group();
+
+      // Desk Top
+      const deskMat = new THREE.MeshStandardMaterial({ color: COLORS.woodDesk, roughness: 0.4 });
+      const deskTop = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.15, 2.4), deskMat);
+      deskTop.position.set(0, 1.4, 0);
+      deskTop.castShadow = true;
+      deskTop.receiveShadow = true;
+      computerGroup.add(deskTop);
+
+      // Desk Legs
+      const legMat = new THREE.MeshStandardMaterial({ color: COLORS.deskLegs, roughness: 0.5 });
+      [[-2.0, 0.7, -1.0], [2.0, 0.7, -1.0], [-2.0, 0.7, 1.0], [2.0, 0.7, 1.0]].forEach(pos => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 0.12), legMat);
+        leg.position.set(...pos);
+        leg.castShadow = true;
+        computerGroup.add(leg);
+      });
+
+      // Monitor Setup
+      const monitorDarkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
+      
+      const monitorBase = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.08, 16), monitorDarkMat);
+      monitorBase.position.set(0, 1.48, -0.4);
+      computerGroup.add(monitorBase);
+
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.1), monitorDarkMat);
+      stem.position.set(0, 1.7, -0.4);
+      computerGroup.add(stem);
+
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(2.7, 1.85, 0.12), monitorDarkMat);
+      frame.position.set(0, 2.5, -0.4);
+      frame.castShadow = true;
+      computerGroup.add(frame);
+
+      // Screen Face
+      const screenMat = new THREE.MeshBasicMaterial({ map: monitorTexture });
+      monitorMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 1.7), screenMat);
+      monitorMesh.position.set(0, 2.5, -0.33);
+      computerGroup.add(monitorMesh);
+
+      // Keyboard & Mouse
+      const kb = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.45), monitorDarkMat);
+      kb.position.set(-0.2, 1.49, 0.3);
+      computerGroup.add(kb);
+
+      const mouse = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.04, 0.22), monitorDarkMat);
+      mouse.position.set(0.7, 1.49, 0.3);
+      computerGroup.add(mouse);
+
+      // --- HOT CHAI / TEA MUG NEXT TO KEYBOARD ---
+      const mugMat = new THREE.MeshStandardMaterial({ color: COLORS.chaiCup, roughness: 0.3 });
+      const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.24, 16), mugMat);
+      mug.position.set(-1.2, 1.59, 0.3);
+      mug.castShadow = true;
+      computerGroup.add(mug);
+
+      // Chai Liquid Top Surface
+      const teaMat = new THREE.MeshBasicMaterial({ color: COLORS.chaiTea });
+      const teaSurface = new THREE.Mesh(new THREE.CircleGeometry(0.1, 16), teaMat);
+      teaSurface.rotation.x = -Math.PI / 2;
+      teaSurface.position.set(-1.2, 1.71, 0.3);
+      computerGroup.add(teaSurface);
+
+      // Steaming Particles Array
+      for (let i = 0; i < 4; i++) {
+        const pMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), pMat);
+        p.position.set(-1.2 + (Math.random() - 0.5) * 0.06, 1.75 + i * 0.08, 0.3 + (Math.random() - 0.5) * 0.06);
+        computerGroup.add(p);
+        chaiSteamParticles.push(p);
+      }
+
+      // --- OFFICE CHAIR ---
+      const chairMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 1.1), chairMat);
+      seat.position.set(0, 0.9, 1.3);
+      seat.castShadow = true;
+      computerGroup.add(seat);
+
+      const backrest = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 0.12), chairMat);
+      backrest.position.set(0, 1.45, 1.8);
+      backrest.castShadow = true;
+      computerGroup.add(backrest);
+
+      const chairStem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 12), legMat);
+      chairStem.position.set(0, 0.45, 1.3);
+      computerGroup.add(chairStem);
+
+      const chairBase = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 16), legMat);
+      chairBase.position.set(0, 0.05, 1.3);
+      computerGroup.add(chairBase);
+
+      scene.add(computerGroup);
+
+      // Dynamic Beam Line
+      const beamMat = new THREE.LineDashedMaterial({
+        color: 0x60a5fa,
+        dashSize: 0.2,
+        gapSize: 0.1,
+        linewidth: 2
+      });
+      beamGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0)]);
+      beamLine = new THREE.Line(beamGeo, beamMat);
+      beamLine.visible = false;
+      scene.add(beamLine);
+    }
+
+    function buildSittingCharacter() {
+      characterGroup = new THREE.Group();
+
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.4 });
+      const shirtMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
+      const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 });
+
+      // Torso sitting on chair
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.32, 0.85, 16), shirtMat);
+      torso.position.set(0, 1.35, 1.3);
+      torso.castShadow = true;
+      characterGroup.add(torso);
+
+      // Head
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 20), skinMat);
+      head.position.set(0, 1.95, 1.3);
+      head.castShadow = true;
+      characterGroup.add(head);
+
+      // Legs bent at chair edge
+      const upperLegL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.65), pantsMat);
+      upperLegL.position.set(-0.2, 0.95, 1.0);
+      const upperLegR = upperLegL.clone();
+      upperLegR.position.x = 0.2;
+      characterGroup.add(upperLegL);
+      characterGroup.add(upperLegR);
+
+      // Lower Legs going down
+      const lowerLegL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.65, 0.16), pantsMat);
+      lowerLegL.position.set(-0.2, 0.55, 0.7);
+      const lowerLegR = lowerLegL.clone();
+      lowerLegR.position.x = 0.2;
+      characterGroup.add(lowerLegL);
+      characterGroup.add(lowerLegR);
+
+      // Arms reaching towards keyboard
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.12), shirtMat);
+      armL.position.set(-0.36, 1.3, 0.9);
+      armL.rotation.x = -Math.PI / 4;
+      const armR = armL.clone();
+      armR.position.x = 0.36;
+      characterGroup.add(armL);
+      characterGroup.add(armR);
+
+      scene.add(characterGroup);
+    }
+
+    function build3DPetAgent() {
+      petAgentGroup = new THREE.Group();
+
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: COLORS.petCore,
+        emissive: 0x3b82f6,
+        emissiveIntensity: 0.8,
+        roughness: 0.2
+      });
+      const petCore = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 24), coreMat);
+      petCore.castShadow = true;
+      petAgentGroup.add(petCore);
+
+      const earMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.3 });
+      const earL = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.25, 12), earMat);
+      earL.position.set(-0.22, 0.3, 0);
+      earL.rotation.z = -0.3;
+      const earR = earL.clone();
+      earR.position.x = 0.22;
+      earR.rotation.z = 0.3;
+      petAgentGroup.add(earL);
+      petAgentGroup.add(earR);
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), eyeMat);
+      eyeL.position.set(-0.1, 0.05, 0.28);
+      const eyeR = eyeL.clone();
+      eyeR.position.x = 0.1;
+      petAgentGroup.add(eyeL);
+      petAgentGroup.add(eyeR);
+
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.5, wireframe: true });
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.02, 8, 24), ringMat);
+      halo.rotation.x = Math.PI / 3;
+      petAgentGroup.add(halo);
+
+      petAgentGroup.position.set(0, 2.5, 0.1);
+      scene.add(petAgentGroup);
+    }
+
+    function buildToolNodes() {
+      const nodesData = [
+        { key: 'SYSTEM', label: 'SYSTEM INFO', code: 'SYS', color: COLORS.nodeSys, pos: [-2.8, 3.2, -2.2] },
+        { key: 'WEATHER', label: 'WEATHER API', code: 'WTHR', color: COLORS.nodeWeather, pos: [-1.0, 4.0, -2.8] },
+        { key: 'CALCULATOR', label: 'CALCULATOR', code: 'CALC', color: COLORS.nodeCalc, pos: [1.0, 4.0, -2.8] },
+        { key: 'FILE', label: 'FILE MANAGER', code: 'FILE', color: COLORS.nodeFile, pos: [2.8, 3.2, -2.2] }
+      ];
+
+      nodesData.forEach(data => {
+        const group = new THREE.Group();
+        
+        const mat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.3 });
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 0.35), mat);
+        box.castShadow = true;
+        group.add(box);
+
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = 128; pCanvas.height = 64;
+        const pCtx = pCanvas.getContext('2d');
+        pCtx.fillStyle = '#ffffff'; pCtx.fillRect(0, 0, 128, 64);
+        pCtx.fillStyle = '#0f172a'; pCtx.font = 'bold 24px monospace';
+        pCtx.textAlign = 'center'; pCtx.fillText(data.code, 64, 42);
+
+        const plaque = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.75, 0.32),
+          new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(pCanvas) })
+        );
+        plaque.position.set(0, 0, 0.19);
+        group.add(plaque);
+
+        group.position.set(...data.pos);
+        scene.add(group);
+        toolNodes[data.key] = group;
+      });
+    }
+
+    /* =========================================================================
+     * 5. SEQUENTIAL STAGE CONTROL & VOICE COMMAND BUBBLES
+     * ========================================================================= */
+    function showVoiceBubble(text) {
+      const bubble = document.getElementById('speech-bubble');
+      document.getElementById('speech-text').innerText = `"${text}"`;
+      
+      // Project 3D Head position to 2D Screen space
+      const headPos = new THREE.Vector3(0, 2.2, 1.3);
+      headPos.project(camera);
+
+      const x = (headPos.x * .5 + .5) * window.innerWidth;
+      const y = (-(headPos.y * .5) + .5) * window.innerHeight;
+
+      bubble.style.left = `${x}px`;
+      bubble.style.top = `${y - 15}px`;
+      bubble.classList.add('visible');
+
+      setTimeout(() => {
+        bubble.classList.remove('visible');
+      }, 2400);
+    }
+
+    function startSequenceTimeline() {
+      if (stageTimeline) stageTimeline.kill();
+
+      stageTimeline = gsap.timeline({
+        onComplete: () => {
+          if (isPlaying) {
+            setTimeout(() => { goToStage(0); }, 4000);
+          }
+        }
+      });
+
+      // --- STAGE 1: Idle & First Voice Command ---
+      stageTimeline.call(() => {
+        updateStageUI(0);
+        showVoiceBubble("Agent, check local system diagnostics!");
+        updateMonitorDisplay("IDLE", ["[VOICE] User: 'Check system diagnostics'"]);
+        setBeamTarget(null);
+      })
+      .to(petAgentGroup.position, { x: 0, y: 2.5, z: 0.1, duration: 1.2, ease: "power2.out" })
+
+      // --- STAGE 2: Visit ONLY System Info Tool -> Return to Computer Screen ---
+      .to({}, { duration: 1.0 })
+      .call(() => {
+        updateStageUI(1);
+        setBeamTarget(toolNodes['SYSTEM'].position);
+      })
+      .to(petAgentGroup.position, {
+        x: toolNodes['SYSTEM'].position.x,
+        y: toolNodes['SYSTEM'].position.y + 0.5,
+        z: toolNodes['SYSTEM'].position.z + 0.4,
+        duration: 1.2, ease: "power2.inOut"
+      })
+      .to(toolNodes['SYSTEM'].scale, { x: 1.25, y: 1.25, z: 1.25, duration: 0.3, yoyo: true, repeat: 1 })
+      // Return back to computer screen
+      .to(petAgentGroup.position, { x: 0, y: 2.5, z: 0.1, duration: 1.0, ease: "power2.out" })
+      .call(() => {
+        setBeamTarget(null);
+        updateMonitorDisplay("SYS_INFO", [
+          "[VOICE] User: 'Check system diagnostics'",
+          "[TOOL RETURN] system_info() completed:",
+          "-> CPU Usage: 14% [4.2 GHz]",
+          "-> RAM Allocated: 8.4 GB / 32 GB"
+        ]);
+      })
+
+      // --- STAGE 3: Second Voice Command -> Visit ONLY Weather Tool -> Return ---
+      .to({}, { duration: 1.2 })
+      .call(() => {
+        updateStageUI(2);
+        showVoiceBubble("Get the weather forecast for Islamabad!");
+        updateMonitorDisplay("WEATHER_REQ", [
+          "[VOICE] User: 'Get weather forecast for Islamabad'",
+          "[SYS LOG] Dispatching weather tool..."
+        ]);
+      })
+      .to({}, { duration: 0.8 })
+      .call(() => { setBeamTarget(toolNodes['WEATHER'].position); })
+      .to(petAgentGroup.position, {
+        x: toolNodes['WEATHER'].position.x,
+        y: toolNodes['WEATHER'].position.y + 0.5,
+        z: toolNodes['WEATHER'].position.z + 0.4,
+        duration: 1.2, ease: "power2.inOut"
+      })
+      .to(toolNodes['WEATHER'].scale, { x: 1.25, y: 1.25, z: 1.25, duration: 0.3, yoyo: true, repeat: 1 })
+      // Return back to computer screen
+      .to(petAgentGroup.position, { x: 0, y: 2.5, z: 0.1, duration: 1.0, ease: "power2.out" })
+      .call(() => {
+        setBeamTarget(null);
+        updateMonitorDisplay("WEATHER", [
+          "[VOICE] User: 'Get weather forecast for Islamabad'",
+          "[TOOL RETURN] get_weather('Islamabad'):",
+          "-> Condition: Clear Sky / Pleasant",
+          "-> Temp: 24°C | Humidity: 45%"
+        ]);
+      })
+
+      // --- STAGE 4: Third Voice Command -> Visit Calculator & File Manager ---
+      .to({}, { duration: 1.2 })
+      .call(() => {
+        updateStageUI(3);
+        showVoiceBubble("Calculate total & inspect project workspace!");
+      })
+      .to({}, { duration: 0.8 })
+      .call(() => { setBeamTarget(toolNodes['CALCULATOR'].position); })
+      .to(petAgentGroup.position, {
+        x: toolNodes['CALCULATOR'].position.x,
+        y: toolNodes['CALCULATOR'].position.y + 0.5,
+        z: toolNodes['CALCULATOR'].position.z + 0.4,
+        duration: 1.0, ease: "power2.inOut"
+      })
+      .to(petAgentGroup.position, {
+        x: toolNodes['FILE'].position.x,
+        y: toolNodes['FILE'].position.y + 0.5,
+        z: toolNodes['FILE'].position.z + 0.4,
+        duration: 1.0, ease: "power2.inOut",
+        onStart: () => setBeamTarget(toolNodes['FILE'].position)
+      })
+      // Return back to computer screen
+      .to(petAgentGroup.position, { x: 0, y: 2.5, z: 0.1, duration: 1.0, ease: "power2.out" })
+      .call(() => {
+        setBeamTarget(null);
+        updateMonitorDisplay("MATH_FILES", [
+          "[TOOL RETURN] calculator + file_manager:",
+          "-> Math Result: 42 * 108 / 1.5 = 3024.0",
+          "-> Workspace: /projects/ai_agent/ (3 files)"
+        ]);
+      })
+
+      // --- STAGE 5: Synthesis & Final Screen Report ---
+      .to({}, { duration: 1.0 })
+      .call(() => {
+        updateStageUI(4);
+        showVoiceBubble("Summarize all gathered reports!");
+        updateMonitorDisplay("SYNTHESIS", [
+          "[VOICE] User: 'Summarize all gathered reports'",
+          "[MCP SYNTHESIS COMPLETE]",
+          "1. System: CPU 14% | RAM 8.4GB",
+          "2. Weather: Islamabad 24°C Sunny",
+          "3. Calc: 3024.0 | Files synced",
+          "Prompt: Ready for next command..."
+        ]);
+      })
+      .to(camera.position, { x: 0, y: 3.5, z: 6.8, duration: 1.5, ease: "power2.inOut" })
+      .to(controls.target, { x: 0, y: 2.2, z: 0, duration: 1.5, ease: "power2.inOut" });
+    }
+
+    function setBeamTarget(targetVec) {
+      if (!targetVec) {
+        beamLine.visible = false;
+        return;
+      }
+      beamLine.visible = true;
+      const points = [
+        new THREE.Vector3(0, 2.5, -0.3),
+        targetVec.clone()
+      ];
+      beamGeo.setFromPoints(points);
+      beamLine.computeLineDistances();
+    }
+
+    function goToStage(stageIdx) {
+      currentStage = stageIdx;
+      updateStageUI(stageIdx);
+
+      if (stageIdx === 0) {
+        gsap.to(camera.position, { x: 0, y: 4.8, z: 11.5, duration: 1 });
+        gsap.to(controls.target, { x: 0, y: 1.8, z: 0, duration: 1 });
+        startSequenceTimeline();
+      } else if (stageIdx === 1) {
+        showVoiceBubble("Check system diagnostics!");
+        gsap.to(petAgentGroup.position, { x: toolNodes['SYSTEM'].position.x, y: toolNodes['SYSTEM'].position.y + 0.5, z: toolNodes['SYSTEM'].position.z + 0.4, duration: 1 });
+        setBeamTarget(toolNodes['SYSTEM'].position);
+      } else if (stageIdx === 2) {
+        showVoiceBubble("Get weather for Islamabad!");
+        gsap.to(petAgentGroup.position, { x: toolNodes['WEATHER'].position.x, y: toolNodes['WEATHER'].position.y + 0.5, z: toolNodes['WEATHER'].position.z + 0.4, duration: 1 });
+        setBeamTarget(toolNodes['WEATHER'].position);
+      } else if (stageIdx === 3) {
+        showVoiceBubble("Calculate tip and check files!");
+        gsap.to(petAgentGroup.position, { x: toolNodes['CALCULATOR'].position.x, y: toolNodes['CALCULATOR'].position.y + 0.5, z: toolNodes['CALCULATOR'].position.z + 0.4, duration: 1 });
+        setBeamTarget(toolNodes['CALCULATOR'].position);
+      } else if (stageIdx === 4) {
+        showVoiceBubble("Synthesize all tool outputs!");
+        gsap.to(petAgentGroup.position, { x: 0, y: 2.5, z: 0.1, duration: 1 });
+        gsap.to(camera.position, { x: 0, y: 3.5, z: 6.8, duration: 1.2 });
+        gsap.to(controls.target, { x: 0, y: 2.2, z: 0, duration: 1.2 });
+        setBeamTarget(null);
+      }
+    }
+
+    function updateStageUI(idx) {
+      currentStage = idx;
+      for (let i = 0; i < 5; i++) {
+        const btn = document.getElementById(`step-btn-${i}`);
+        if (btn) {
+          if (i === idx) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      }
+      document.getElementById('status-text').innerText = STAGE_DESCRIPTIONS[idx];
+    }
+
+    function setupEvents() {
+      window.addEventListener('resize', onWindowResize);
+
+      document.getElementById('btn-replay').addEventListener('click', () => {
+        goToStage(0);
+      });
+
+      const playPauseBtn = document.getElementById('btn-play-pause');
+      playPauseBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        if (isPlaying) {
+          if (stageTimeline) stageTimeline.play();
+          document.getElementById('play-icon').className = 'fa-solid fa-pause';
+          document.getElementById('play-text').innerText = 'Pause';
+        } else {
+          if (stageTimeline) stageTimeline.pause();
+          document.getElementById('play-icon').className = 'fa-solid fa-play';
+          document.getElementById('play-text').innerText = 'Play';
+        }
+      });
+
+      document.getElementById('btn-prev').addEventListener('click', () => {
+        const prev = (currentStage - 1 + 5) % 5;
+        goToStage(prev);
+      });
+
+      document.getElementById('btn-next').addEventListener('click', () => {
+        const next = (currentStage + 1) % 5;
+        goToStage(next);
+      });
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('canvas-container');
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = Date.now() * 0.0025;
+      
+      // Floating motion for Pet Agent
+      if (petAgentGroup) {
+        petAgentGroup.position.y += Math.sin(time * 3) * 0.0025;
+        petAgentGroup.rotation.y = Math.sin(time) * 0.12;
+      }
+
+      // Steaming Hot Chai particles animation
+      chaiSteamParticles.forEach((p, idx) => {
+        p.position.y += 0.0015;
+        p.material.opacity -= 0.005;
+        if (p.position.y > 2.05) {
+          p.position.y = 1.75;
+          p.material.opacity = 0.4;
+        }
+      });
+
+      // Gentle floating animation for tool nodes
+      Object.keys(toolNodes).forEach((key, idx) => {
+        if (toolNodes[key]) {
+          toolNodes[key].position.y += Math.sin(time * 2 + idx) * 0.0015;
+        }
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>

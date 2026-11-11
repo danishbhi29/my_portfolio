@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Chatbot 3D Scene</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Three.js & GSAP Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #e6e4dc;
+      color: #212529;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    .mono {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Minimal Compact UI Overlay Cards */
+    .hero-card {
+      background: rgba(235, 233, 226, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .glass-btn {
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .glass-btn:hover {
+      background: rgba(255, 255, 255, 0.98);
+      transform: translateY(-1px);
+    }
+
+    .glass-btn.active {
+      background: #10b981;
+      color: white;
+      border-color: #059669;
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+  
+    html, body { width:100%; height:100%; min-height:0; margin:0; overflow:hidden; background:#e9ebe2; }
+    body { position:relative; }
+    #canvas-container { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; }
+    #canvas-container canvas { display:block; width:100%; height:100%; }
+    body > .absolute:not(#canvas-container), body > #monitor-canvas { display:none !important; }
+  </style>
+</head>
+<body class="w-screen h-screen overflow-hidden">
+
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
+
+  <!-- TOP MINIMAL BAR OVERLAY (Pushed to absolute top edge to NEVER obstruct center scene) -->
+  <div class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    
+    <!-- Left Meta Info -->
+    <div class="hero-card px-4 py-2 rounded-xl pointer-events-auto flex items-center gap-3">
+      <span class="text-xs font-semibold tracking-wider text-gray-400 mono">02 / RAG FULL STACK</span>
+      <h1 class="text-sm font-bold text-gray-900 border-l border-gray-300 pl-3">PDF Chatbot</h1>
+      <div class="hidden md:flex items-center gap-1.5 mono text-[10px] border-l border-gray-300 pl-3">
+        <span class="px-1.5 py-0.5 bg-white/90 border border-gray-300/80 rounded text-gray-700">React</span>
+        <span class="px-1.5 py-0.5 bg-white/90 border border-gray-300/80 rounded text-gray-700">FastAPI</span>
+        <span class="px-1.5 py-0.5 bg-emerald-100 border border-emerald-300 rounded text-emerald-800 font-medium">Gemini</span>
+      </div>
+    </div>
+
+    <!-- Right Workflow Stages Pill Navigation -->
+    <div class="hero-card p-1.5 rounded-xl pointer-events-auto flex items-center gap-1 text-[11px] mono">
+      <button onclick="goToStage(0)" id="step-btn-0" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold">1</span>
+        <span class="hidden sm:inline">Inspect</span>
+      </button>
+
+      <button onclick="goToStage(1)" id="step-btn-1" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">2</span>
+        <span class="hidden sm:inline">Slot In</span>
+      </button>
+
+      <button onclick="goToStage(2)" id="step-btn-2" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">3</span>
+        <span class="hidden sm:inline">Vectorize</span>
+      </button>
+
+      <button onclick="goToStage(3)" id="step-btn-3" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">4</span>
+        <span class="hidden sm:inline">Sit</span>
+      </button>
+
+      <button onclick="goToStage(4)" id="step-btn-4" class="glass-btn px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">5</span>
+        <span class="hidden sm:inline">Chat QA</span>
+      </button>
+
+      <button id="btn-replay" class="glass-btn px-2 py-1 rounded-lg text-gray-700 ml-1" title="Replay">
+        <i class="fa-solid fa-rotate-right text-[10px]"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- BOTTOM STATUS & CONTROL BAR -->
+  <div class="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-20 w-11/12 max-w-lg pointer-events-auto">
+    <div class="hero-card px-4 py-2 rounded-full flex items-center justify-between shadow-md">
+      <div class="flex items-center gap-2 overflow-hidden mr-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+        <span id="status-text" class="text-[11px] font-medium mono text-gray-700 truncate">Stage 1/5: Inspecting PDF document...</span>
+      </div>
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="btn-prev" class="w-7 h-7 rounded-full glass-btn flex items-center justify-center text-[10px] text-gray-700">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <button id="btn-play-pause" class="px-2.5 py-1 rounded-full glass-btn text-[10px] font-semibold mono text-emerald-800 flex items-center gap-1">
+          <i id="play-icon" class="fa-solid fa-pause"></i>
+          <span id="play-text">Pause</span>
+        </button>
+        <button id="btn-next" class="w-7 h-7 rounded-full glass-btn flex items-center justify-center text-[10px] text-gray-700">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Offscreen Canvas for Dynamic Monitor Texture -->
+  <canvas id="monitor-canvas" width="512" height="384" class="hidden"></canvas>
+
+  <script>
+    /* =========================================================================
+     * 1. GLOBAL STATE & SCENE SETUP
+     * ========================================================================= */
+    let scene, camera, renderer, controls;
+    let characterGroup, pdfDocMesh, monitorMesh, chairMesh, computerGroup;
+    let nodeEmbed, nodeVectorDB, nodeLLM, nodeChunk;
+    let monitorCanvas, monitorCtx, monitorTexture;
+    
+    let leftArm, rightArm, headGroup, characterBody, leftLeg, rightLeg;
+
+    let currentStage = 0;
+    let isPlaying = true;
+    let stageTimeline = null;
+
+    const STAGE_DESCRIPTIONS = [
+      "Stage 1/5: Inspecting PDF document before ingestion...",
+      "Stage 2/5: Inserting PDF into computer slot...",
+      "Stage 3/5: Extracting chunks & embedding into ChromaDB...",
+      "Stage 4/5: Sitting at console station...",
+      "Stage 5/5: Live RAG Q&A session with PDF Chatbot!"
+    ];
+
+    const COLORS = {
+      bg: 0xe9ebe2,
+      grid: 0xc8c6be,
+      accentEmerald: 0x10b981,
+      blockGreen: 0x059669,
+      woodDesk: 0xd6cbb0,
+      deskLegs: 0x334155,
+      girlSkin: 0xfcd34d,
+      girlHair: 0x451a03,
+      girlShirt: 0x059669,
+      girlPants: 0x1e293b,
+      pdfRed: 0xef4444
+    };
+
+    /* =========================================================================
+     * 2. INITIALIZATION & CAMERA OPTIMIZATION
+     * ========================================================================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      initScene();
+      initMonitorCanvas();
+      buildEnvironment();
+      buildComputerAndDesk();
+      buildCharacter();
+      buildPipelineNodes();
+      setupLighting();
+      setupEvents();
+
+      startSequenceTimeline();
+      animate();
+    });
+
+    function initScene() {
+      const container = document.getElementById('canvas-container');
+      
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(COLORS.bg);
+      scene.fog = new THREE.Fog(COLORS.bg, 25, 60);
+
+      camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+      
+      // CRITICAL CAMERA POSITION & ELEVATION FOR CLEAR VISIBILITY
+      camera.position.set(0, 4.0, 9.5);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.02;
+      controls.minDistance = 3;
+      controls.maxDistance = 25;
+      
+      // TARGET CENTERED RIGHT AT DESK SCREEN LEVEL
+      controls.target.set(0, 1.8, 0);
+    }
+
+    function setupLighting() {
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+      dirLight.position.set(8, 14, 8);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 0.5;
+      dirLight.shadow.camera.far = 30;
+      dirLight.shadow.camera.left = -10;
+      dirLight.shadow.camera.right = 10;
+      dirLight.shadow.camera.top = 10;
+      dirLight.shadow.camera.bottom = -10;
+      scene.add(dirLight);
+
+      const fillLight = new THREE.DirectionalLight(0xfef08a, 0.35);
+      fillLight.position.set(-8, 6, -6);
+      scene.add(fillLight);
+    }
+
+    function buildEnvironment() {
+      // Grid Floor matching reference pictures
+      const gridHelper = new THREE.GridHelper(40, 40, COLORS.grid, COLORS.grid);
+      gridHelper.position.y = 0;
+      gridHelper.material.opacity = 0.7;
+      gridHelper.material.transparent = true;
+      scene.add(gridHelper);
+
+      // Shadow receiver plane
+      const planeGeo = new THREE.PlaneGeometry(80, 80);
+      const planeMat = new THREE.ShadowMaterial({ opacity: 0.1 });
+      const shadowPlane = new THREE.Mesh(planeGeo, planeMat);
+      shadowPlane.rotation.x = -Math.PI / 2;
+      shadowPlane.position.y = -0.01;
+      shadowPlane.receiveShadow = true;
+      scene.add(shadowPlane);
+    }
+
+    /* =========================================================================
+     * 3. MONITOR CANVAS & TEXTURE
+     * ========================================================================= */
+    function initMonitorCanvas() {
+      monitorCanvas = document.getElementById('monitor-canvas');
+      monitorCtx = monitorCanvas.getContext('2d');
+      monitorTexture = new THREE.CanvasTexture(monitorCanvas);
+      monitorTexture.encoding = THREE.sRGBEncoding;
+      updateMonitorDisplay("STANDBY", "Awaiting PDF Document input...");
+    }
+
+    function updateMonitorDisplay(status, chatText) {
+      const w = monitorCanvas.width;
+      const h = monitorCanvas.height;
+
+      monitorCtx.fillStyle = '#0f172a';
+      monitorCtx.fillRect(0, 0, w, h);
+
+      // Top Window Header Bar
+      monitorCtx.fillStyle = '#1e293b';
+      monitorCtx.fillRect(0, 0, w, 40);
+
+      monitorCtx.fillStyle = '#ef4444'; monitorCtx.beginPath(); monitorCtx.arc(18, 20, 5, 0, Math.PI * 2); monitorCtx.fill();
+      monitorCtx.fillStyle = '#f59e0b'; monitorCtx.beginPath(); monitorCtx.arc(34, 20, 5, 0, Math.PI * 2); monitorCtx.fill();
+      monitorCtx.fillStyle = '#10b981'; monitorCtx.beginPath(); monitorCtx.arc(50, 20, 5, 0, Math.PI * 2); monitorCtx.fill();
+
+      monitorCtx.fillStyle = '#94a3b8';
+      monitorCtx.font = '600 13px "Fira Code", monospace';
+      monitorCtx.fillText("PDF Chatbot Console", 70, 24);
+
+      monitorCtx.fillStyle = status === "ACTIVE" || status === "READY" ? '#10b981' : '#f59e0b';
+      monitorCtx.fillRect(w - 110, 10, 95, 20);
+      monitorCtx.fillStyle = '#ffffff';
+      monitorCtx.font = 'bold 10px "Fira Code", monospace';
+      monitorCtx.fillText(status, w - 98, 24);
+
+      // Inner Console Area
+      monitorCtx.fillStyle = '#1e293b';
+      monitorCtx.strokeStyle = '#334155';
+      monitorCtx.strokeRect(15, 52, w - 30, h - 68);
+
+      if (status === "INGESTING") {
+        monitorCtx.fillStyle = '#38bdf8';
+        monitorCtx.font = 'bold 16px "Inter", sans-serif';
+        monitorCtx.fillText("INGESTING & VECTORIZING PDF...", 30, 90);
+
+        monitorCtx.fillStyle = '#334155';
+        monitorCtx.fillRect(30, 115, w - 60, 20);
+        monitorCtx.fillStyle = '#10b981';
+        monitorCtx.fillRect(30, 115, (w - 60) * 0.8, 20);
+
+        monitorCtx.fillStyle = '#94a3b8';
+        monitorCtx.font = '12px "Fira Code", monospace';
+        monitorCtx.fillText("-> Extracting text tokens (PyPDF)...", 30, 165);
+        monitorCtx.fillText("-> Chunking: 500 tokens | Overlap: 50", 30, 190);
+        monitorCtx.fillText("-> Generating Gemini Embeddings...", 30, 215);
+        monitorCtx.fillText("-> Storing vectors into ChromaDB...", 30, 240);
+
+      } else if (status === "ACTIVE") {
+        // Chat prompt display
+        monitorCtx.fillStyle = '#334155';
+        roundRect(monitorCtx, 30, 70, w - 100, 45, 6, true, false);
+        monitorCtx.fillStyle = '#38bdf8';
+        monitorCtx.font = 'bold 11px "Inter", sans-serif';
+        monitorCtx.fillText("Q: What are dense retrievers?", 40, 88);
+        monitorCtx.fillStyle = '#cbd5e1';
+        monitorCtx.font = '11px "Inter", sans-serif';
+        monitorCtx.fillText("Asked by User regarding PDF content", 40, 104);
+
+        monitorCtx.fillStyle = '#064e3b';
+        roundRect(monitorCtx, 60, 128, w - 90, 85, 6, true, false);
+        monitorCtx.fillStyle = '#34d399';
+        monitorCtx.font = 'bold 11px "Inter", sans-serif';
+        monitorCtx.fillText("A: Gemini RAG Assistant", 72, 146);
+        monitorCtx.fillStyle = '#ecfdf5';
+        monitorCtx.font = '11px "Inter", sans-serif';
+        monitorCtx.fillText("Embeddings map queries and passages into a shared", 72, 166);
+        monitorCtx.fillText("dense vector space to accurately retrieve relevant text.", 72, 184);
+
+        monitorCtx.fillStyle = '#0f172a';
+        monitorCtx.fillRect(30, h - 55, w - 60, 28);
+        monitorCtx.strokeStyle = '#10b981';
+        monitorCtx.strokeRect(30, h - 55, w - 60, 28);
+        monitorCtx.fillStyle = '#10b981';
+        monitorCtx.font = '12px "Fira Code", monospace';
+        monitorCtx.fillText("Ask follow-up question... |", 40, h - 36);
+
+      } else {
+        monitorCtx.fillStyle = '#94a3b8';
+        monitorCtx.font = 'bold 16px "Inter", sans-serif';
+        monitorCtx.fillText("PDF Chatbot Terminal", 30, 100);
+        monitorCtx.font = '13px "Inter", sans-serif';
+        monitorCtx.fillText(chatText, 30, 130);
+        
+        monitorCtx.strokeStyle = '#10b981';
+        monitorCtx.lineWidth = 1.5;
+        monitorCtx.setLineDash([4, 4]);
+        monitorCtx.strokeRect(120, 160, 270, 70);
+        monitorCtx.setLineDash([]);
+        monitorCtx.fillStyle = '#34d399';
+        monitorCtx.font = '12px "Fira Code", monospace';
+        monitorCtx.fillText("DROP PDF FILE INTO DESK SLOT", 145, 200);
+      }
+
+      if (monitorTexture) monitorTexture.needsUpdate = true;
+    }
+
+    function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      if (fill) ctx.fill();
+      if (stroke) ctx.stroke();
+    }
+
+    /* =========================================================================
+     * 4. 3D OBJECT BUILDERS (Desk, Computer, Chair, PDF, Character)
+     * ========================================================================= */
+    function buildComputerAndDesk() {
+      computerGroup = new THREE.Group();
+
+      // --- DESK ---
+      const deskTopGeo = new THREE.BoxGeometry(4.2, 0.15, 2.2);
+      const deskMat = new THREE.MeshStandardMaterial({ color: COLORS.woodDesk, roughness: 0.4 });
+      const deskTop = new THREE.Mesh(deskTopGeo, deskMat);
+      deskTop.position.set(0, 1.4, 0);
+      deskTop.castShadow = true;
+      deskTop.receiveShadow = true;
+      computerGroup.add(deskTop);
+
+      // Desk Legs
+      const legGeo = new THREE.BoxGeometry(0.12, 1.4, 0.12);
+      const legMat = new THREE.MeshStandardMaterial({ color: COLORS.deskLegs, roughness: 0.5 });
+      const legPositions = [
+        [-1.9, 0.7, -0.9],
+        [ 1.9, 0.7, -0.9],
+        [-1.9, 0.7,  0.9],
+        [ 1.9, 0.7,  0.9]
+      ];
+      legPositions.forEach(pos => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(...pos);
+        leg.castShadow = true;
+        computerGroup.add(leg);
+      });
+
+      // --- COMPUTER TERMINAL ---
+      const monitorDarkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
+      
+      const monitorBase = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.08, 16), monitorDarkMat);
+      monitorBase.position.set(0, 1.48, -0.3);
+      monitorBase.castShadow = true;
+      computerGroup.add(monitorBase);
+
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.1), monitorDarkMat);
+      stem.position.set(0, 1.7, -0.3);
+      stem.castShadow = true;
+      computerGroup.add(stem);
+
+      const frameGeo = new THREE.BoxGeometry(2.6, 1.8, 0.12);
+      const frame = new THREE.Mesh(frameGeo, monitorDarkMat);
+      frame.position.set(0, 2.5, -0.3);
+      frame.castShadow = true;
+      computerGroup.add(frame);
+
+      // Monitor Screen Face
+      const screenGeo = new THREE.PlaneGeometry(2.45, 1.65);
+      const screenMat = new THREE.MeshBasicMaterial({ map: monitorTexture });
+      monitorMesh = new THREE.Mesh(screenGeo, screenMat);
+      monitorMesh.position.set(0, 2.5, -0.23);
+      computerGroup.add(monitorMesh);
+
+      // PDF Insertion Slot on Right Desk Surface
+      const slotGeo = new THREE.BoxGeometry(1.0, 0.04, 0.3);
+      const slotMat = new THREE.MeshStandardMaterial({ color: COLORS.accentEmerald, emissive: 0x059669, emissiveIntensity: 0.6 });
+      const slot = new THREE.Mesh(slotGeo, slotMat);
+      slot.position.set(1.1, 1.48, 0.2);
+      computerGroup.add(slot);
+
+      // Keyboard & Mouse
+      const kb = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.04, 0.4), monitorDarkMat);
+      kb.position.set(-0.2, 1.49, 0.4);
+      computerGroup.add(kb);
+
+      const mouse = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.04, 0.22), monitorDarkMat);
+      mouse.position.set(0.6, 1.49, 0.4);
+      computerGroup.add(mouse);
+
+      // --- DESK CHAIR ---
+      chairMesh = new THREE.Group();
+      const seatMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.1, 1.1), seatMat);
+      seat.position.y = 0.9;
+      seat.castShadow = true;
+      chairMesh.add(seat);
+
+      const back = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 0.1), seatMat);
+      back.position.set(0, 1.4, 0.5);
+      back.castShadow = true;
+      chairMesh.add(back);
+
+      const chairStem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.9), legMat);
+      chairStem.position.y = 0.45;
+      chairMesh.add(chairStem);
+
+      const chairBase = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 5), legMat);
+      chairBase.position.y = 0.03;
+      chairMesh.add(chairBase);
+
+      chairMesh.position.set(0, 0, 1.5);
+      scene.add(chairMesh);
+
+      scene.add(computerGroup);
+
+      buildPDFDocument();
+    }
+
+    function buildPDFDocument() {
+      pdfDocMesh = new THREE.Group();
+
+      // Create high-res canvas texture for PDF cover
+      const pdfCanvas = document.createElement('canvas');
+      pdfCanvas.width = 512;
+      pdfCanvas.height = 712;
+      const ctx = pdfCanvas.getContext('2d');
+
+      // Background Paper
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 512, 712);
+
+      // Red Top Header Banner
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(0, 0, 512, 220);
+
+      // BOLD BOLD WHITE "PDF" TEXT ON RED HEADER
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 120px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PDF', 256, 110);
+
+      // Main Document Body Text lines
+      ctx.fillStyle = '#cbd5e1';
+      for (let i = 0; i < 5; i++) {
+        ctx.fillRect(60, 280 + i * 45, 392, 18);
+      }
+
+      // HUGE STYLIZED "PDF" WATERMARK / LOGO ON BODY
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+      ctx.font = '900 160px "Inter", sans-serif';
+      ctx.fillText('PDF', 256, 560);
+
+      // Outer Border
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 16;
+      ctx.strokeRect(8, 8, 496, 696);
+
+      const pdfTexture = new THREE.CanvasTexture(pdfCanvas);
+      pdfTexture.encoding = THREE.sRGBEncoding;
+
+      // Front paper sheet with custom PDF canvas texture
+      const sheetMat = new THREE.MeshStandardMaterial({
+        map: pdfTexture,
+        roughness: 0.2,
+        metalness: 0.1
+      });
+
+      const sheet = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 1.0, 0.04),
+        [
+          new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }), // right
+          new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }), // left
+          new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }), // top
+          new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }), // bottom
+          sheetMat, // front (PDF cover canvas texture)
+          new THREE.MeshStandardMaterial({ color: 0xf8fafc })  // back
+        ]
+      );
+      sheet.castShadow = true;
+      pdfDocMesh.add(sheet);
+
+      pdfDocMesh.position.set(-2.2, 2.1, 1.5);
+      pdfDocMesh.rotation.set(0.2, 0.4, 0.1);
+      scene.add(pdfDocMesh);
+    }
+
+    function buildCharacter() {
+      characterGroup = new THREE.Group();
+
+      const skinMat = new THREE.MeshStandardMaterial({ color: COLORS.girlSkin, roughness: 0.6 });
+      const shirtMat = new THREE.MeshStandardMaterial({ color: COLORS.girlShirt, roughness: 0.5 });
+      const pantsMat = new THREE.MeshStandardMaterial({ color: COLORS.girlPants, roughness: 0.7 });
+      const hairMat = new THREE.MeshStandardMaterial({ color: COLORS.girlHair, roughness: 0.8 });
+
+      // Torso
+      characterBody = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.8, 12), shirtMat);
+      characterBody.position.y = 1.35;
+      characterBody.castShadow = true;
+      characterGroup.add(characterBody);
+
+      // Head
+      headGroup = new THREE.Group();
+      headGroup.position.y = 1.95;
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 16), skinMat);
+      head.castShadow = true;
+      headGroup.add(head);
+
+      const hairTop = new THREE.Mesh(new THREE.SphereGeometry(0.29, 16, 16, 0, Math.PI * 2, 0, Math.PI / 1.8), hairMat);
+      hairTop.position.y = 0.03;
+      headGroup.add(hairTop);
+
+      const ponytail = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.4, 8), hairMat);
+      ponytail.rotation.x = -Math.PI / 3;
+      ponytail.position.set(0, 0.05, -0.28);
+      headGroup.add(ponytail);
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
+      eyeL.position.set(-0.09, 0.03, 0.23);
+      const eyeR = eyeL.clone();
+      eyeR.position.x = 0.09;
+      headGroup.add(eyeL);
+      headGroup.add(eyeR);
+
+      characterGroup.add(headGroup);
+
+      // Arms
+      const armGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.6, 8);
+      armGeo.translate(0, -0.3, 0);
+
+      leftArm = new THREE.Group();
+      leftArm.position.set(-0.3, 1.65, 0);
+      leftArm.add(new THREE.Mesh(armGeo, shirtMat));
+      characterGroup.add(leftArm);
+
+      rightArm = new THREE.Group();
+      rightArm.position.set(0.3, 1.65, 0);
+      rightArm.add(new THREE.Mesh(armGeo, shirtMat));
+      characterGroup.add(rightArm);
+
+      // Legs
+      const legGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.9, 8);
+      legGeo.translate(0, -0.45, 0);
+
+      leftLeg = new THREE.Group();
+      leftLeg.position.set(-0.14, 0.95, 0);
+      leftLeg.add(new THREE.Mesh(legGeo, pantsMat));
+      characterGroup.add(leftLeg);
+
+      rightLeg = new THREE.Group();
+      rightLeg.position.set(0.14, 0.95, 0);
+      rightLeg.add(new THREE.Mesh(legGeo, pantsMat));
+      characterGroup.add(rightLeg);
+
+      characterGroup.position.set(-2.2, 0, 1.5);
+      characterGroup.rotation.y = Math.PI / 4;
+
+      scene.add(characterGroup);
+    }
+
+    /* =========================================================================
+     * 5. PIPELINE NODES (Centered & visible behind desk)
+     * ========================================================================= */
+    function buildPipelineNodes() {
+      const nodeGroup = new THREE.Group();
+
+      // Chunking Block (CK)
+      nodeChunk = createTechBlock("CK", 0x059669);
+      nodeChunk.position.set(-3.2, 2.0, -2.5);
+      nodeGroup.add(nodeChunk);
+
+      // Embeddings Block (MD)
+      nodeEmbed = createTechBlock("MD", 0x059669);
+      nodeEmbed.position.set(-1.1, 2.0, -3.2);
+      nodeGroup.add(nodeEmbed);
+
+      // Vector DB Cylinder (Chroma)
+      nodeVectorDB = createCylinderNode("Chroma", 0x34d399);
+      nodeVectorDB.position.set(1.1, 2.0, -3.2);
+      nodeGroup.add(nodeVectorDB);
+
+      // Gemini AI Block (AI)
+      nodeLLM = createTechBlock("AI", 0x059669);
+      nodeLLM.position.set(3.2, 2.0, -2.5);
+      nodeGroup.add(nodeLLM);
+
+      // Dotted pipeline connectors
+      const lineMat = new THREE.LineDashedMaterial({ color: 0x059669, dashSize: 0.15, gapSize: 0.08 });
+      const points = [
+        [new THREE.Vector3(-2.4, 2.0, -2.5), new THREE.Vector3(-1.8, 2.0, -3.2)],
+        [new THREE.Vector3(-0.4, 2.0, -3.2), new THREE.Vector3(0.4, 2.0, -3.2)],
+        [new THREE.Vector3(1.8, 2.0, -3.2), new THREE.Vector3(2.4, 2.0, -2.5)]
+      ];
+      points.forEach(pts => {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const line = new THREE.Line(lineGeo, lineMat);
+        line.computeLineDistances();
+        nodeGroup.add(line);
+      });
+
+      scene.add(nodeGroup);
+    }
+
+    function createTechBlock(code, colorHex) {
+      const group = new THREE.Group();
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 1.0, 0.4),
+        new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3 })
+      );
+      box.castShadow = true;
+      group.add(box);
+
+      const plaqueCanvas = document.createElement('canvas');
+      plaqueCanvas.width = 128; plaqueCanvas.height = 64;
+      const pCtx = plaqueCanvas.getContext('2d');
+      pCtx.fillStyle = '#ffffff'; pCtx.fillRect(0,0,128,64);
+      pCtx.fillStyle = '#064e3b'; pCtx.font = 'bold 28px monospace';
+      pCtx.textAlign = 'center'; pCtx.fillText(code, 64, 44);
+
+      const plaque = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.8, 0.35),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(plaqueCanvas) })
+      );
+      plaque.position.set(0, 0, 0.21);
+      group.add(plaque);
+
+      return group;
+    }
+
+    function createCylinderNode(code, colorHex) {
+      const group = new THREE.Group();
+      const cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.65, 0.65, 0.9, 24),
+        new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3 })
+      );
+      cyl.castShadow = true;
+      group.add(cyl);
+
+      const plaqueCanvas = document.createElement('canvas');
+      plaqueCanvas.width = 128; plaqueCanvas.height = 64;
+      const pCtx = plaqueCanvas.getContext('2d');
+      pCtx.fillStyle = '#ffffff'; pCtx.fillRect(0,0,128,64);
+      pCtx.fillStyle = '#065f46'; pCtx.font = 'bold 20px monospace';
+      pCtx.textAlign = 'center'; pCtx.fillText(code, 64, 42);
+
+      const plaque = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.9, 0.35),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(plaqueCanvas) })
+      );
+      plaque.position.set(0, -0.1, 0.66);
+      group.add(plaque);
+
+      return group;
+    }
+
+    /* =========================================================================
+     * 6. SEQUENTIAL ANIMATION TIMELINE & CONTROLLER
+     * ========================================================================= */
+    function startSequenceTimeline() {
+      if (stageTimeline) stageTimeline.kill();
+
+      stageTimeline = gsap.timeline({
+        onComplete: () => {
+          if (isPlaying) {
+            setTimeout(() => { goToStage(0); }, 5000);
+          }
+        }
+      });
+
+      updateStageUI(0);
+
+      // --- STAGE 1: Inspect Document ---
+      stageTimeline.to(pdfDocMesh.position, {
+        y: 2.3,
+        duration: 1.5,
+        ease: "power2.out",
+        onStart: () => updateStageUI(0)
+      })
+      .to(pdfDocMesh.rotation, { y: Math.PI * 2 + 0.4, duration: 2, ease: "none" }, "<")
+      .to(leftArm.rotation, { x: -0.6, z: 0.3, duration: 1 }, "<")
+      .to(rightArm.rotation, { x: -0.6, z: -0.3, duration: 1 }, "<")
+
+      // --- STAGE 2: Insert PDF Slot ---
+      .to({}, { duration: 0.5 })
+      .call(() => updateStageUI(1))
+      .to(characterGroup.position, {
+        x: 1.1,
+        z: 1.5,
+        duration: 2.0,
+        ease: "power1.inOut",
+        onUpdate: () => {
+          const t = gsap.ticker.time * 10;
+          leftLeg.rotation.x = Math.sin(t) * 0.4;
+          rightLeg.rotation.x = -Math.sin(t) * 0.4;
+        },
+        onComplete: () => {
+          leftLeg.rotation.x = 0; rightLeg.rotation.x = 0;
+        }
+      })
+      .to(characterGroup.rotation, { y: 0, duration: 0.6 }, "-=0.8")
+      .to(pdfDocMesh.position, { x: 1.1, y: 2.1, z: 0.8, duration: 1.2, ease: "power2.inOut" }, "-=1.2")
+      .to(pdfDocMesh.rotation, { x: Math.PI / 2, y: 0, z: 0, duration: 0.8 }, "-=0.8")
+      .to(pdfDocMesh.position, { y: 1.49, z: 0.2, duration: 0.8, ease: "power2.in" })
+      .to(pdfDocMesh.scale, { x: 0.05, y: 0.05, z: 0.05, duration: 0.4 }, "-=0.2")
+
+      // --- STAGE 3: Vectorize & Process ---
+      .call(() => {
+        updateStageUI(2);
+        updateMonitorDisplay("INGESTING", "");
+      })
+      .to(nodeChunk.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.4, yoyo: true, repeat: 1 })
+      .to(nodeEmbed.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.4, yoyo: true, repeat: 1 })
+      .to(nodeVectorDB.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.4, yoyo: true, repeat: 1 })
+      .to(nodeLLM.scale, { x: 1.2, y: 1.2, z: 1.2, duration: 0.4, yoyo: true, repeat: 1 })
+
+      // --- STAGE 4: Sit at Desk ---
+      .to({}, { duration: 0.6 })
+      .call(() => updateStageUI(3))
+      .to(characterGroup.position, {
+        x: 0,
+        z: 1.5,
+        duration: 1.5,
+        ease: "power1.inOut",
+        onUpdate: () => {
+          const t = gsap.ticker.time * 10;
+          leftLeg.rotation.x = Math.sin(t) * 0.3;
+          rightLeg.rotation.x = -Math.sin(t) * 0.3;
+        }
+      })
+      .to(characterGroup.rotation, { y: 0, duration: 0.4 })
+      .to(characterGroup.position, { y: -0.4, z: 1.35, duration: 0.8, ease: "back.out(1.2)" })
+      .to(leftLeg.rotation, { x: -Math.PI / 2.2, duration: 0.6 }, "<")
+      .to(rightLeg.rotation, { x: -Math.PI / 2.2, duration: 0.6 }, "<")
+      .to(leftArm.rotation, { x: -0.5, y: 0.2, duration: 0.6 }, "<")
+      .to(rightArm.rotation, { x: -0.5, y: -0.2, duration: 0.6 }, "<")
+
+      // --- STAGE 5: Ask PDF Chatbot ---
+      .call(() => {
+        updateStageUI(4);
+        updateMonitorDisplay("ACTIVE", "");
+      })
+      .to(camera.position, { x: 0, y: 3.2, z: 6.5, duration: 1.5, ease: "power2.inOut" })
+      .to(controls.target, { x: 0, y: 2.2, z: 0, duration: 1.5, ease: "power2.inOut" });
+    }
+
+    function goToStage(stageIdx) {
+      currentStage = stageIdx;
+      updateStageUI(stageIdx);
+
+      if (stageIdx === 0) {
+        resetPositions();
+        gsap.to(camera.position, { x: 0, y: 4.5, z: 12, duration: 1 });
+        gsap.to(controls.target, { x: 0, y: 1.8, z: 0, duration: 1 });
+        startSequenceTimeline();
+      } else if (stageIdx === 1) {
+        gsap.to(characterGroup.position, { x: 1.1, y: 0, z: 1.5, duration: 1 });
+        gsap.to(pdfDocMesh.position, { x: 1.1, y: 1.49, z: 0.2, duration: 1 });
+        updateMonitorDisplay("STANDBY", "PDF insertion in progress...");
+      } else if (stageIdx === 2) {
+        updateMonitorDisplay("INGESTING", "");
+      } else if (stageIdx === 3) {
+        gsap.to(characterGroup.position, { x: 0, y: -0.4, z: 1.35, duration: 1 });
+        gsap.to(leftLeg.rotation, { x: -Math.PI / 2.2, duration: 0.6 });
+        gsap.to(rightLeg.rotation, { x: -Math.PI / 2.2, duration: 0.6 });
+        updateMonitorDisplay("READY", "Terminal Console Ready!");
+      } else if (stageIdx === 4) {
+        gsap.to(characterGroup.position, { x: 0, y: -0.4, z: 1.35, duration: 0.5 });
+        gsap.to(camera.position, { x: 0, y: 3.2, z: 6.5, duration: 1.2 });
+        gsap.to(controls.target, { x: 0, y: 2.2, z: 0, duration: 1.2 });
+        updateMonitorDisplay("ACTIVE", "");
+      }
+    }
+
+    function updateStageUI(idx) {
+      currentStage = idx;
+      for (let i = 0; i < 5; i++) {
+        const btn = document.getElementById(`step-btn-${i}`);
+        if (btn) {
+          if (i === idx) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        }
+      }
+      document.getElementById('status-text').innerText = STAGE_DESCRIPTIONS[idx];
+    }
+
+    function resetPositions() {
+      pdfDocMesh.position.set(-2.2, 2.1, 1.5);
+      pdfDocMesh.rotation.set(0.2, 0.4, 0.1);
+      pdfDocMesh.scale.set(1, 1, 1);
+
+      characterGroup.position.set(-2.2, 0, 1.5);
+      characterGroup.rotation.set(0, Math.PI / 4, 0);
+      leftLeg.rotation.set(0, 0, 0);
+      rightLeg.rotation.set(0, 0, 0);
+      leftArm.rotation.set(0, 0, 0);
+      rightArm.rotation.set(0, 0, 0);
+      headGroup.rotation.set(0, 0, 0);
+
+      updateMonitorDisplay("STANDBY", "Awaiting PDF Document input...");
+    }
+
+    function setupEvents() {
+      window.addEventListener('resize', onWindowResize);
+
+      document.getElementById('btn-replay').addEventListener('click', () => {
+        goToStage(0);
+      });
+
+      const playPauseBtn = document.getElementById('btn-play-pause');
+      playPauseBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        if (isPlaying) {
+          if (stageTimeline) stageTimeline.play();
+          document.getElementById('play-icon').className = 'fa-solid fa-pause';
+          document.getElementById('play-text').innerText = 'Pause';
+        } else {
+          if (stageTimeline) stageTimeline.pause();
+          document.getElementById('play-icon').className = 'fa-solid fa-play';
+          document.getElementById('play-text').innerText = 'Play';
+        }
+      });
+
+      document.getElementById('btn-prev').addEventListener('click', () => {
+        const prev = (currentStage - 1 + 5) % 5;
+        goToStage(prev);
+      });
+
+      document.getElementById('btn-next').addEventListener('click', () => {
+        const next = (currentStage + 1) % 5;
+        goToStage(next);
+      });
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('canvas-container');
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = Date.now() * 0.0015;
+      if (nodeChunk) nodeChunk.position.y = 2.0 + Math.sin(time) * 0.1;
+      if (nodeEmbed) nodeEmbed.position.y = 2.0 + Math.cos(time * 1.2) * 0.1;
+      if (nodeVectorDB) nodeVectorDB.position.y = 2.0 + Math.sin(time * 0.9) * 0.1;
+      if (nodeLLM) nodeLLM.position.y = 2.0 + Math.cos(time * 1.1) * 0.1;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
